@@ -1,0 +1,131 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  Project Deutzia:  CFN Template To Create CloudWatch Log with Subscription Filter.
+
+Metadata:
+  TemplateName: cloudwatch-log-stack.yaml
+  TemplateType: CloudWatch Log Group
+  Version: 1.0.0
+  Owner: Subhamay Bhattacharyya
+  ProjectName: Deutzia
+  Modification History:
+    - 1.0.0   - June 29, 2023           -- Initial Version 
+  Resources: 
+    - CloudWatch Log Group
+  StepsToTest: |
+    Manualy verify the Stack.
+  StepsToCleanup: |
+    Stack delete command
+
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+    #################################### Project Name and Environment ##############################
+    - Label: 
+        default: "Project And Environment:"
+      Parameters: 
+        - ProjectName
+        - Environment
+    #################################### KMS Key ###################################################
+    # - Label: 
+    #     default: "KMS Configuration:"
+    #   Parameters: 
+    #   - KmsMasterKeyAlias
+    #################################### CloudWatch Log Group ######################################
+    - Label: 
+        default: "CloudWatch Configuration:"
+      Parameters: 
+        - CloudWatchLogGroupBaseName
+    ParameterLabels:
+      ################################## Project Name and Environment ##############################
+      ProjectName:
+        default: "The Project Name."
+      Environment:
+        default: "Environment Name."
+      ################################## KMS #######################################################
+      # KmsMasterKeyAlias: 
+      #   default: "The KMS Master Key Alias To Be Used For Server Side Encryption."
+      ################################## SNS #######################################################
+      ################################## CloudWatch ################################################
+      CloudWatchLogGroupBaseName:
+        default: "The Base Name The CloudWatch Log Group.The Region And Environment Will Be Added As Suffix By The Template."
+Parameters:
+  ###################################### Project Name and Environment ##############################
+  ProjectName:
+    Default: project
+    Description: "The Project Name."
+    Type: String
+    MinLength: 5
+    MaxLength: 30
+    AllowedPattern: "[a-z]*"
+    ConstraintDescription: "The length should be between 5 and 30, must contain only lowercase alphabets."
+  Environment:
+    Default: devl
+    Description: "The Environment Name."
+    Type: String
+    AllowedValues: ["devl", "test", "prod"]
+    ConstraintDescription: "The Environment must be devl / test or prod"
+  ###################################### KMS #######################################################
+  # KmsMasterKeyAlias:
+  #   Default: "SB-KMS"
+  #   Description: "The KMS Master Key Alias To Be Used For Server Side Encryption."
+  #   Type: String
+  #   MinLength: 5
+  #   MaxLength: 20
+  #   AllowedPattern: "[a-zA-Z0-9-]*"
+  #   ConstraintDescription: "The length of the KMS Key Alias should be beteen 5 and 20 and can only contain lowercase alphanumeric characters and dash."
+  ###################################### CloudWatch Log Group ######################################
+  CloudWatchLogGroupBaseName:
+    Default: cloudtrail-logs
+    Description: "The Base Name The CloudWatch Log Group.The Region And Environment Will Be Added As Suffix By The Template."
+    Type: String
+    MinLength: 10
+    MaxLength: 40
+    AllowedPattern: '[a-zA-Z-]*'
+  CloudTrailCloudWatchRoleName:
+    Default: cloudtrail-iam-role
+    Description: "The Execution Role Of The CloudTrail CloudWatch Log."
+    Type: String
+    MinLength: 10
+    MaxLength: 40
+    AllowedPattern: '[a-zA-Z-]*'
+    ConstraintDescription: "Must be between 5 and 255 characters long and begin with a letter and can contain number or hyphen (-)."
+  ###################################### Kinesis Data Stream #######################################
+  KinesisDataStreamBaseName:
+    Default: cw-log-data-stream
+    Description: The Name Of The Kinesis Datastream.
+    Type: String
+    MinLength: 15
+    MaxLength: 100
+    AllowedPattern: '[a-zA-Z-]*'
+    ConstraintDescription: Must be between 15 and 100 characters long and begin with a letter and can contain number or hyphen (-).
+Resources:
+  ###################################### CloudWatch Log Group ######################################
+  CloudWatchLogGroup:
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Retain
+    Type: AWS::Logs::LogGroup
+    Properties: 
+      # KmsKeyId: !Ref KmsMasterKeyId
+      LogGroupName: !Sub '${ProjectName}-${CloudWatchLogGroupBaseName}-${Environment}-${AWS::Region}'
+      RetentionInDays: 14
+      Tags: 
+      - Key: ProjectName
+        Value: !Ref ProjectName
+      - Key:  Environment
+        Value: !Ref Environment
+  SubscriptionFilter: 
+    DependsOn:
+         - CloudWatchLogGroup
+    Type: AWS::Logs::SubscriptionFilter
+    Properties: 
+      RoleArn: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${ProjectName}-${CloudTrailCloudWatchRoleName}'
+      LogGroupName: !Sub '${ProjectName}-${CloudWatchLogGroupBaseName}-${Environment}-${AWS::Region}'
+      FilterPattern: ""
+      DestinationArn: !Sub 'arn:${AWS::Partition}:kinesis:${AWS::Region}:${AWS::AccountId}:stream/${ProjectName}-${KinesisDataStreamBaseName}-${Environment}-${AWS::Region}'
+Outputs:
+  CWLogGroupArn:
+    Description: The Arn of the CloudWatch Log Group
+    Value: !GetAtt CloudWatchLogGroup.Arn
+  CWLogGroupSubscriptionFilter:
+    Description: The URL of the SQS Queue.
+    Value: !Ref SubscriptionFilter

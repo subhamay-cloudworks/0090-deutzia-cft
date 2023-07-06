@@ -1,0 +1,769 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  Project Deutzia: Root Stack Template To Create A S3 Bucket, A DynamoDB Table, A Lambda Function,
+  CloudWatch Log Group with Subscription Filter and a CloudTrail Trail for Data Events.
+
+Metadata:
+  TemplateName: deutzia-root-stack.yaml
+  TemplateType: Lambda / DynamoDB Table / S3 Bucket / CloudWatch Log Group / CloudTrail Trail
+  Version: 1.0.3
+  Owner: Subhamay Bhattacharyya
+  ProjectName: Tarius
+  Modification History:
+    - 1.0.0  - Jun 28, 2023   -- Initial Version
+  Resources: 
+    - One DynamoDB Table.
+    - One S3 Bucket with default folder
+    - One Lambda Function
+    - One Kinesis Data Stream
+    - Lambda,CloudTrail CloudWatch and Glue IAM Role
+    - CloudWatch Log Group with Event Subscription
+    - Glue Crawler 
+    - Glue Database
+    - Athena WorkGroup
+  StepsToTest: |
+    Manualy verify the Stack.
+  StepsToCleanup: |
+    Stack delete command
+
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+    #################################### Project Name and Environment ##############################
+    - Label: 
+        default: "Project And Environment:"
+      Parameters: 
+        - ProjectName
+        - Environment
+    #################################### Code Repository Bucket ####################################
+    - Label: 
+        default: "Code Repository Bucket:"
+      Parameters:
+        - CodeRepositoryS3Bucket
+    #################################### KMS Key ###################################################
+    # - Label: 
+    #     default: "KMS Configuration:"
+    #   Parameters: 
+    #     - KmsMasterKeyAlias
+    #     - KmsMasterKeyId
+    #################################### Dead Letter Queue #########################################
+    - Label: 
+        default: "SQS Configuration:"
+      Parameters: 
+        - SQSQueueBaseName
+        - DelaySeconds
+        - MaximumMessageSize
+        - MessageRetentionPeriod
+        - ReceiveMessageWaitTimeSeconds
+        - VisibilityTimeout
+    #################################### S3 Bucket #################################################
+    - Label:
+        default: "S3 Configuration:"
+      Parameters:
+      - S3BucketBaseName
+      - S3DefaultFolder
+      - S3BucketBlockPublicAcls
+      - S3BucketBlockPublicPolicy
+      - S3BucketIgnorePublicAcls
+      - S3BucketRestrictPublicBuckets
+      - S3CustomResourceStackName
+    #################################### DynamoDB Table ############################################
+    - Label: 
+        default: "DynamoDB Configuration:"
+      Parameters: 
+      - DynamoDBTableBaseName
+      - DynamoDBTablePartitionKey
+      - DynamoDBTablePartitionKeyAttributeType
+    #################################### Kinesis Data Stream #######################################
+    - Label: 
+        default: "Kinesis Data Stream:"
+      Parameters: 
+        - KinesisDataStreamBaseName
+        - KinesisDataStreamRetensionPeriod
+        - KinesisShardCount
+        - KinesisBatchSize
+        - KinesisBatchWindow
+        - KinesisConcBatchesPerShard
+        - KinesisLambdaMaxRetryAttempts
+    #################################### CloudTrail ################################################
+    - Label: 
+        default: "CloudTrail Configuration:"
+      Parameters:
+        - CloudTrailCloudWatchRoleName
+        - CloudTrailCloudWatchPolicyName
+        - CloudTrailBaseName
+    #################################### CloudWatch ################################################
+    - Label: 
+        default: "CloudWatch Log Configuration:"
+      Parameters:
+        - CloudWatchLogGroupBaseName
+    #################################### Lambda Function ###########################################
+    - Label: 
+        default: "Lambda Configuration:"
+      Parameters: 
+        - LambdaExecutionRoleName
+        - LambdaExecutionPolicyName
+        - LambdaFunctionBaseName
+        - LambdaFunctionTimeoutSecs
+        - LambdaRuntime
+        - LambdaFunctionMemory
+        - LambdaCodeKey
+    #################################### Glue ######################################################
+    - Label:
+        default: "Glue Configuration:"
+      Parameters:
+      - GlueExecutionRoleName
+      - GlueExecutionPolicyName
+      - GlueDatabaseBaseName
+      - GlueCrawlerBaseName
+    ParameterLabels:
+      ################################## Project Name and Environment ##############################
+      ProjectName:
+        default: "Project Name."
+      Environment:
+        default: "Environment Name."
+      ################################## Code Repository Bucket ####################################
+      CodeRepositoryS3Bucket:
+        default: "Lambda Code S3 Bucket."
+      ################################## KMS Key ###################################################
+      # KmsMasterKeyAlias:
+      #   default: "KMS Key Alias."
+      # KmsMasterKeyId:
+      #   default: "KMS Key Id."
+      ################################## Dead Letter Queue #########################################
+      SQSQueueBaseName:
+        default: "DLQ Base Name."
+      DelaySeconds:
+        default: "Delay Seconds."
+      MaximumMessageSize:
+        default: "Maximum Message Size."
+      MessageRetentionPeriod: 
+        default: "Message Retention Period."
+      ReceiveMessageWaitTimeSeconds: 
+        default: "Received Message Wait Time Seconds."
+      VisibilityTimeout:
+        default: "Visibility Timeout."
+      ################################## S3 Bucket #################################################
+      S3BucketBaseName:
+        default: "S3 Bucket Name."
+      S3DefaultFolder:
+        default: "Folder Name."
+      S3BucketBlockPublicAcls: 
+        default: "Block Public Acls."
+      S3BucketBlockPublicPolicy:
+        default: "Block Public Policy."
+      S3BucketIgnorePublicAcls:
+        default: "Ignore Public Acls."
+      S3BucketRestrictPublicBuckets:
+        default: "Restrict Public Buckets."
+      S3CustomResourceStackName:
+        default: "S3 Custom Resource Stack."
+      # S3NotificationEventName:
+      #   default: "The S3 Notification Event Name."
+      # S3NotificationPrefix: 
+      #   default: "S3 Bucket Prefix For The Event Notification."
+      # S3NotificationSuffix: 
+      #   default: "S3 Bucket Suffix For The Event Notification."
+      ################################## DynamoDB Table ############################################
+      DynamoDBTableBaseName: 
+        default: "DynamoDB Table."
+      DynamoDBTablePartitionKey:
+        default: "Partition Key."
+      DynamoDBTablePartitionKeyAttributeType: 
+        default: "Partition Key Datatype."
+      ################################## Kinesis Data Stream #######################################
+      KinesisDataStreamBaseName:
+        default: "The Kinesis Data Stream Name."
+      KinesisDataStreamRetensionPeriod:
+        default: "The Kinesis Data Stream Retension Period."
+      KinesisShardCount:
+        default: "Kinesis Shard Count."
+      KinesisBatchSize:
+        default: "Kineis Data Stream Batch Size in the Lambba Trigger."
+      KinesisBatchWindow:
+        default: "Kineis Data Stream Batch Window Size in the Lambba Trigger."
+      KinesisConcBatchesPerShard:
+        default: "Kineis Data Stream Concurrent Batchs Per Shard in the Lambba Trigger."
+      KinesisLambdaMaxRetryAttempts: 
+        default: "The Maximum Number of Retries Before Which The Event Willbe sent to error SQS"
+      ################################## CloudTrail ################################################
+      CloudTrailCloudWatchRoleName:
+        default: "The Execution Role Of The CloudTrail CloudWatch Log."
+      CloudTrailCloudWatchPolicyName:
+        default: "The Execution Policy Attached To The CloudTrail CloudWatch IAM Role."
+      CloudTrailBaseName:
+        default: "The Base Name The CloudTrail Trail. The Region And Environment Will Be Added As Suffix By The Template."
+      ###################################### CloudWatch ################################################
+      CloudWatchLogGroupBaseName:
+        default: "The Base Name The CloudWatch Log Group.The Region And Environment Will Be Added As Suffix By The Template."
+      ################################## Lambda Function ###########################################
+      LambdaExecutionRoleName:
+        default: "Lambda Execution Role."
+      LambdaExecutionPolicyName: 
+        default: "Lambda Excution Policy."
+      LambdaFunctionBaseName:
+        default: "Lambda Function Name."
+      LambdaFunctionTimeoutSecs:
+        default: "Lambda Function Timeout."
+      LambdaRuntime:
+        default: "Lambda Function Runtime."
+      LambdaFunctionMemory:
+        default: "Lambda Function Memory Size."
+      LambdaCodeKey: 
+        default: "Lambda Code Zip File."
+      GlueExecutionRoleName:
+        default: "Glue Execution IAM Role Name."
+      GlueExecutionPolicyName:
+        default: "Glue Execution IAM Policy Name."
+      GlueDatabaseBaseName:
+        default: "Glue Database Base Name."
+      GlueCrawlerBaseName:
+        default: "Glue Crawler Base Name."
+Parameters:
+  ###################################### Project Name and Environment ##############################
+  ProjectName:
+    Default: deutzia
+    Description: "The Project Name."
+    Type: String
+    MinLength: 5
+    MaxLength: 30
+    AllowedPattern: "[a-z]*"
+    ConstraintDescription: "The length should be between 5 and 30, must contain only lowercase alphabets."
+  Environment:
+    Default: devl
+    Description: "The Environment Name."
+    Type: String
+    AllowedValues: ["devl", "test", "prod"]
+    ConstraintDescription: "The Environment must be devl / test or prod"
+  ###################################### Code Repository Bucket ####################################
+  CodeRepositoryS3Bucket:
+    Default: subhamay-projects-repository-us-east-1
+    Description: "S3 Bucket Storing The Lambda Code."
+    Type: String
+    MinLength: 10
+    MaxLength: 40
+    AllowedPattern: "[a-z][a-z0-9-.]*"
+    ConstraintDescription: "The length should be between 3 and 63, must contain only lowercase letter,numbers,dash, dot and should start with a letter."
+  ###################################### KMS Key ###################################################
+  # KmsMasterKeyAlias:
+  #   Default: "SB-KMS"
+  #   Description: "The KMS Master Key Alias To Be Used For Server Side Encryption."
+  #   Type: String
+  #   MinLength: 5
+  #   MaxLength: 20
+  #   AllowedPattern: "[a-zA-Z0-9-]*"
+  #   ConstraintDescription: "The length of the KMS Key Alias should be beteen 5 and 20 and can only contain lowercase alphanumeric characters and dash."
+  # KmsMasterKeyId:
+  #   Default: "e4c733c5-9fbe-4a90-bda1-6f0362bc9b89"
+  #   Description: "The KMS Key Id Used For Encryption."
+  #   Type: String
+  #   MinLength: 36
+  #   MaxLength: 36
+  #   AllowedPattern: "[a-z0-9-]*"
+  #   ConstraintDescription: "The length of the KMS Key Id should be 36 and must be lowercase alphabets, numbers and dash."
+  ###################################### Dead Letter Queue #########################################
+  SQSQueueBaseName:
+    Default: "sqs-queue"
+    Description: "The Base Name Of The Sqs Queue (Dead Letter Quque). The Region And Environment Will Be Added As Suffix By The Template."
+    Type: String
+    MinLength: 8
+    MaxLength: 40
+    AllowedPattern: "[a-z][a-z0-9-]*"
+    ConstraintDescription: "The length should be between 8 and 40, must contain only lowercase letter, number, dash, dot and should start with a letter."
+  DelaySeconds:
+    Type: Number
+    Description: "Delay Seconds."
+    Default: 0
+    MinValue: 0
+    MaxValue: 900
+  MaximumMessageSize:
+    Type: Number
+    Description: "Maximum Message Size."
+    Default: 262144
+    MinValue: 1024
+    MaxValue: 262144
+  MessageRetentionPeriod:
+    Type: Number
+    Description: "Message Retention Period."
+    Default: 345600
+    MinValue: 60
+    MaxValue: 1209600
+  ReceiveMessageWaitTimeSeconds:
+    Type: Number
+    Description: "Received Message Wait Time Seconds."
+    Default: 0
+    MinValue: 0
+    MaxValue: 20
+  VisibilityTimeout:
+    Type: Number
+    Description: "Visibility Timeout."
+    Default: 30
+    MinValue: 1
+    MaxValue: 43200  
+  ###################################### S3 Bucket #################################################
+  S3BucketBaseName:
+    Default: cloudtrail
+    Description: "The S3 Bucket Base Name For The CloudTrail Data. The Region And Environment Will Be Added As Suffix By The Template."
+    Type: String
+    MinLength: 3
+    MaxLength: 40
+    AllowedPattern: "[a-z][a-z0-9-.]*"
+    ConstraintDescription: "The length should be between 3 and 40, must contain only lowercase letter,numbers,dash, dot and should start with a letter."
+  S3DefaultFolder:
+    Default: "cloud-trail,audit-trail,athena-output"
+    Description: "The Folder To Be Created For Storing The Raw Data. Use Do_not_create If You Do Not Want To Create Any Folder."
+    Type: String
+    ConstraintDescription: "Should be a comma seperated folder names."
+  S3BucketBlockPublicAcls:
+    Default: true
+    Description: "Allow Block Public Acls"
+    Type: String
+    AllowedValues: [true, false]
+  S3BucketBlockPublicPolicy:
+    Default: false
+    Description: "Allow Block Public Policy"
+    Type: String
+    AllowedValues: [true, false]
+  S3BucketIgnorePublicAcls:
+    Default: true
+    Description: "Allow Ignore Public Acls"
+    Type: String
+    AllowedValues: [true, false]
+  S3BucketRestrictPublicBuckets:
+    Default: false
+    Description: "Allow Restrict Public Buckets"
+    Type: String
+    AllowedValues: [true, false]
+  S3CustomResourceStackName:
+    Default: "deutzia-s3-custom-resource-stack"
+    Description: "S3 Custom Resource Stack Name"
+    Type: String
+  ###################################### DynamoDB Table ############################################
+  DynamoDBTableBaseName:
+    Default: products
+    Description: "The Name Of The Dynamodb Table."
+    Type: String
+    MinLength: 8
+    MaxLength: 40
+    AllowedPattern: "[a-z][a-z0-9-]*"
+    ConstraintDescription: "The length should be between 10 and 40, must contain only lowercase letter, number, dash and should start with a letter."
+  DynamoDBTablePartitionKey:
+    Default: ID
+    Description: "The Name Of The Dynamodb Partition Key."
+    Type: String
+    MinLength: 2
+    MaxLength: 30
+    AllowedPattern: '[a-zA-Z][a-zA-Z0-9\-_]*'
+    ConstraintDescription: "Must begin with a letter and contain only alphanumeric characters."
+  DynamoDBTablePartitionKeyAttributeType:
+    Default: "S"
+    Description: "The Datatype Of The Dynamodb Partition Key."
+    Type: String
+    AllowedValues: ["N", "S", "B"]
+    ConstraintDescription: "The datatype should be either N (Number), S (String) or B (Binary)"
+  ###################################### Kinesis Data Stream #######################################
+  KinesisDataStreamBaseName:
+    Default: cw-log-data-stream
+    Description: The Name Of The Kinesis Datastream.
+    Type: String
+    MinLength: 15
+    MaxLength: 100
+    AllowedPattern: '[a-zA-Z-]*'
+    ConstraintDescription: Must be between 15 and 100 characters long and begin with a letter and can contain number or hyphen (-).
+  KinesisDataStreamRetensionPeriod:
+    Default: 24
+    Description: The Kinesis Datastream data retension period.
+    Type: Number
+    MinValue: '24'
+    MaxValue: '2500'
+    ConstraintDescription: must be between 24 and 2500.
+  KinesisShardCount:
+    Default: 1
+    Description: The Kinesis Datastream Shard Count.
+    Type: Number
+    MinValue: 1
+    MaxValue: 10
+    ConstraintDescription: must be between 1 and 10.
+  KinesisBatchSize:
+    Default: 500
+    Description: The count of shards in the Kinesis Data Stream.
+    Type: Number
+    MinValue: 1
+    MaxValue: 10000
+    ConstraintDescription: The batch size should be between 1 and 1000.
+  KinesisBatchWindow:
+    Default: 30
+    Description: Kinesis Data Stream Batch Window Size.
+    Type: Number
+    MinValue: 1
+    MaxValue: 60
+    ConstraintDescription: The batch size should be between 1 and 60.
+  KinesisConcBatchesPerShard: 
+    Default: 1
+    Description: Kinesis Data Stream Concurrent Batches per Shard used by the Trigger.
+    Type: Number
+    MinValue: 1
+    MaxValue: 10
+    ConstraintDescription: The batch size should be between 1 and 10.
+  KinesisLambdaMaxRetryAttempts: 
+    Default: 3
+    Description: The Maximum Number of Retries Before Which The Event Willbe sent to error SQS .
+    Type: Number
+    MinValue: 2
+    MaxValue: 5
+    ConstraintDescription: The batch size should be between 2 and 5.
+  ###################################### CloudWatch ################################################
+  CloudWatchLogGroupBaseName:
+    Default: cloudtrail-logs
+    Description: "The Base Name The CloudWatch Log Group.The Region And Environment Will Be Added As Suffix By The Template."
+    Type: String
+    MinLength: 10
+    MaxLength: 40
+    AllowedPattern: '[a-zA-Z-]*'
+  ###################################### CloudTrail ################################################
+  CloudTrailCloudWatchRoleName:
+    Default: cloudtrail-iam-role-for-cloudwatch
+    Description: "The Execution Role Of The CloudTrail CloudWatch Log."
+    Type: String
+    MinLength: 10
+    MaxLength: 50
+    AllowedPattern: '[a-zA-Z-]*'
+    ConstraintDescription: "Must be between 10 and 50 characters long and begin with a letter and can contain number or hyphen (-)."
+  CloudTrailCloudWatchPolicyName:
+    Default: cloudtrail-iam-policy-for-cloudwatch
+    Description: "The Execution Policy Attached To The CloudTrail CloudWatch IAM Role."
+    Type: String
+    MinLength: 10
+    MaxLength: 50
+    AllowedPattern: '[a-zA-Z-]*'
+    ConstraintDescription: "Must be between 10 and 50 characters long and begin with a letter and can contain number or hyphen (-)."
+  CloudTrailBaseName:
+    Default: scan-cw-logs
+    Description: "The Base Name The Lambda Function. The Region And Environment Will Be Added As Suffix By The Template."
+    Type: String
+    MinLength: 10
+    MaxLength: 40
+    AllowedPattern: '[a-zA-Z-]*'
+  ###################################### Lambda Function ###########################################
+  LambdaExecutionRoleName:
+    Default: lambda-iam-role
+    Description: "The Execution Role Of The Lambda Function."
+    Type: String
+    MinLength: 10
+    MaxLength: 40
+    AllowedPattern: '[a-zA-Z-]*'
+    ConstraintDescription: "Must be between 5 and 255 characters long and begin with a letter and can contain number or hyphen (-)."
+  LambdaExecutionPolicyName:
+    Default: lambda-iam-policy
+    Description: "The Execution Policy Attached To The Lambda Execution Role."
+    Type: String
+    MinLength: 10
+    MaxLength: 40
+    AllowedPattern: '[a-zA-Z-]*'
+    ConstraintDescription: "Must be between 10 and 40 characters long and begin with a letter and can contain number or hyphen (-)."
+  LambdaFunctionBaseName:
+    Default: process-cloudwatch-logs
+    Description: "The Base Name The Lambda Function. The Region And Environment Will Be Added As Suffix By The Template."
+    Type: String
+    MinLength: 15
+    MaxLength: 50
+    AllowedPattern: '[a-zA-Z0-9-]*'
+    ConstraintDescription: "Must be between 15 and 50 characters long and begin with a letter and can contain number or hyphen (-)."
+  LambdaFunctionTimeoutSecs:
+    Default: 300
+    Description: "The Lambda Function Timeout Period (In Seconds)"
+    Type: Number
+    MinValue: 3
+    MaxValue: 900
+    ConstraintDescription: must be between 3 and 900 seconds.
+  LambdaRuntime:
+    Default: python3.8
+    Description: "Lambda Runtime (Python 3.7, 3.8 or 3.9)"
+    Type: String
+    AllowedValues: [python3.7 ,python3.8, python3.9]
+    ConstraintDescription: "The Lambda runtime should be either Python 3.7, 3.8 or 3.9"
+  LambdaFunctionMemory:
+    Default: 256
+    Description: The Lambda Function Memory in MB.
+    Type: Number
+    MinValue: 128
+    MaxValue: 10240
+    ConstraintDescription: The Lambda Memory should be between 128 and 10240.
+  LambdaCodeKey:
+    Default: 0090-deutzia/code/python/deutzia_code.zip
+    Description: "The Zip File Name Containing The Lambda Code."
+    Type: String
+    MinLength: 10
+    MaxLength: 100
+    AllowedPattern: "[a-zA-Z0-9-/_.]*"
+    ConstraintDescription: "The length should be between 10 and 100, must contain only lowercase letter,numbers,dash, dot, underscore"
+  ###################################### Glue ######################################################
+  GlueExecutionRoleName:
+    Default: glue-iam-role
+    Description: "The Execution Role Of The Glue Crawler."
+    Type: String
+    MinLength: 10
+    MaxLength: 50
+    AllowedPattern: '[a-zA-Z-]*'
+    ConstraintDescription: "Must be between 10 and 50 characters long and begin with a letter and can contain number or hyphen (-)."
+  GlueExecutionPolicyName:
+    Default: glue-iam-policy
+    Description: "The Execution Policy Attached To Glue IAM Role."
+    Type: String
+    MinLength: 10
+    MaxLength: 50
+    AllowedPattern: '[a-zA-Z-]*'
+    ConstraintDescription: "Must be between 10 and 50 characters long and begin with a letter and can contain number or hyphen (-)."
+  GlueDatabaseBaseName:
+    Default: glue-database
+    Description: "The Base Name The Glue Database.The Region And Environment Will Be Added As Suffix By The Template."
+    Type: String
+    MinLength: 10
+    MaxLength: 40
+    AllowedPattern: '[a-zA-Z-]*'
+  GlueCrawlerBaseName:
+    Default: glue-crawler
+    Description: "The Base Name The Glue Database.The Region And Environment Will Be Added As Suffix By The Template."
+    Type: String
+    MinLength: 10
+    MaxLength: 40
+    AllowedPattern: '[a-zA-Z-]*'
+Resources:
+  DeutziaSQSDestinationForKinesis:
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Retain
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub 'https://${CodeRepositoryS3Bucket}.s3.amazonaws.com/0090-deutzia/cft/nested-stacks/sqs-stack.yaml'
+      Parameters:  
+        ProjectName: !Ref ProjectName
+        Environment: !Ref Environment
+        SQSQueueBaseName: !Ref SQSQueueBaseName
+        DelaySeconds: !Ref DelaySeconds 
+        # KmsMasterKeyAlias: !Ref KmsMasterKeyAlias
+        MaximumMessageSize: !Ref MaximumMessageSize
+        MessageRetentionPeriod: !Ref MessageRetentionPeriod
+        ReceiveMessageWaitTimeSeconds: !Ref ReceiveMessageWaitTimeSeconds
+        VisibilityTimeout: !Ref VisibilityTimeout
+      TimeoutInMinutes: 15
+  ###################################### S3 Bucket #################################################
+  DeutziaS3Bucket:
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Retain
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub 'https://${CodeRepositoryS3Bucket}.s3.amazonaws.com/0090-deutzia/cft/nested-stacks/s3-stack.yaml'
+      Parameters:  
+        ProjectName: !Ref ProjectName
+        Environment: !Ref Environment
+        S3BucketBaseName: !Ref S3BucketBaseName
+        S3DefaultFolder: !Ref S3DefaultFolder
+        S3BucketBlockPublicAcls: !Ref S3BucketBlockPublicAcls
+        S3BucketBlockPublicPolicy: !Ref S3BucketBlockPublicPolicy 
+        S3BucketIgnorePublicAcls: !Ref S3BucketIgnorePublicAcls
+        S3BucketRestrictPublicBuckets: !Ref S3BucketRestrictPublicBuckets
+        S3CustomResourceStackName: !Ref S3CustomResourceStackName
+        CloudTrailBaseName: !Ref CloudTrailBaseName
+        # S3KmsMasterKeyAlias: !Ref KmsMasterKeyAlias
+      TimeoutInMinutes: 15
+  ###################################### DynamoDB Table ############################################
+  DeutziaDynamoDBTable:
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Retain
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub 'https://${CodeRepositoryS3Bucket}.s3.amazonaws.com/0090-deutzia/cft/nested-stacks/dynamodb-stack.yaml'
+      Parameters:  
+        ProjectName: !Ref ProjectName
+        Environment: !Ref Environment
+        DynamoDBTableBaseName: !Ref DynamoDBTableBaseName
+        DynamoDBTablePartitionKey: !Ref DynamoDBTablePartitionKey 
+        DynamoDBTablePartitionKeyAttributeType: !Ref DynamoDBTablePartitionKeyAttributeType
+        # DynamoDBTableKmsMasterKeyAlias: !Ref KmsMasterKeyAlias
+      TimeoutInMinutes: 15
+  ###################################### Kinesis Data Stream #######################################
+  DeutziaKinesisDataStream:
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Retain
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub 'https://${CodeRepositoryS3Bucket}.s3.amazonaws.com/0090-deutzia/cft/nested-stacks/kinesis-stack.yaml'
+      Parameters:  
+        ProjectName: !Ref ProjectName
+        Environment: !Ref Environment
+        KinesisDataStreamBaseName: !Ref KinesisDataStreamBaseName
+        KinesisShardCount: !Ref KinesisShardCount 
+        KinesisDataStreamRetensionPeriod: !Ref KinesisDataStreamRetensionPeriod
+        # KinesisKmsMasterKeyAlias: !Ref KmsMasterKeyAlias
+      TimeoutInMinutes: 15
+  ###################################### IAM Role ##################################################
+  DeutziaIAMRole:
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Retain
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub 'https://${CodeRepositoryS3Bucket}.s3.amazonaws.com/0090-deutzia/cft/nested-stacks/iam-role-stack.yaml'
+      Parameters:  
+        ProjectName: !Ref ProjectName
+        Environment: !Ref Environment
+        LambdaExecutionRoleName: !Sub '${ProjectName}-${LambdaExecutionRoleName}'
+        LambdaExecutionPolicyName: !Sub '${ProjectName}-${LambdaExecutionPolicyName}'
+        LambdaFunctionBaseName: !Ref LambdaFunctionBaseName
+        CloudTrailCloudWatchRoleName: !Sub '${ProjectName}-${CloudTrailCloudWatchRoleName}'
+        CloudTrailCloudWatchPolicyName: !Sub '${ProjectName}-${CloudTrailCloudWatchPolicyName}'
+        CloudWatchLogGroupBaseName: !Ref CloudWatchLogGroupBaseName
+        GlueExecutionRoleName: !Ref GlueExecutionRoleName
+        GlueExecutionPolicyName: !Ref GlueExecutionPolicyName
+        SQSQueueBaseName: !Ref SQSQueueBaseName
+        S3BucketBaseName: !Ref S3BucketBaseName
+        KinesisDataStreamBaseName: !Ref KinesisDataStreamBaseName
+        # KmsMasterKeyId: !Ref KmsMasterKeyId
+      TimeoutInMinutes: 15
+  ###################################### Lambda Function ###########################################
+  DeutziaLambdaFunction:
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Retain
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub 'https://${CodeRepositoryS3Bucket}.s3.amazonaws.com/0090-deutzia/cft/nested-stacks/lambda-function-stack.yaml'
+      Parameters:  
+        ProjectName: !Ref ProjectName
+        Environment: !Ref Environment
+        LambdaExecutionRoleArn: !GetAtt DeutziaIAMRole.Outputs.LambdaExecutionRoleArn
+        LambdaHandlerPath: "deutzia_code.lambda_handler"
+        LambdaRuntime: !Ref LambdaRuntime
+        LambdaFunctionTimeoutSecs: !Ref LambdaFunctionTimeoutSecs
+        LambdaFunctionMemory: !Ref LambdaFunctionMemory 
+        LambdaFunctionCodeBucket: !Ref CodeRepositoryS3Bucket
+        LambdaFunctionCodeKey: !Ref LambdaCodeKey
+        LambdaFunctionBaseName: !Ref LambdaFunctionBaseName 
+        LambdaFunctionDescription: "Lambda Function to read the CloudWatch logs using Kinesis Data Stream and loading them to S3 bucket as a CSV file."
+        S3BucketBaseName: !Ref S3BucketBaseName
+        S3DefaultFolder: "audit-trail"
+      TimeoutInMinutes: 15
+  ###################################### CloudWatch Log Group ######################################
+  DeutziaCloudWatchLogGroup:
+    DependsOn:
+         - DeutziaKinesisDataStream
+         - DeutziaIAMRole
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Retain
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub 'https://${CodeRepositoryS3Bucket}.s3.amazonaws.com/0090-deutzia/cft/nested-stacks/cloudwatch-log-stack.yaml'
+      Parameters:  
+        ProjectName: !Ref ProjectName
+        Environment: !Ref Environment
+        CloudWatchLogGroupBaseName: !Ref CloudWatchLogGroupBaseName
+        KinesisDataStreamBaseName: !Ref KinesisDataStreamBaseName
+        CloudTrailCloudWatchRoleName: !Ref CloudTrailCloudWatchRoleName
+      TimeoutInMinutes: 15
+  ###################################### CloudTrail Trail ##############################################################
+  DeutziaCloudTrailTrail:
+    DependsOn:
+      - DeutziaCloudWatchLogGroup
+      - DeutziaIAMRole
+      - DeutziaS3Bucket
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Retain
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub 'https://${CodeRepositoryS3Bucket}.s3.amazonaws.com/0090-deutzia/cft/nested-stacks/cloudtrail-stack.yaml'
+      Parameters:  
+        ProjectName: !Ref ProjectName
+        Environment: !Ref Environment
+        CloudWatchLogGroupBaseName: !Ref CloudWatchLogGroupBaseName
+        CloudTrailCloudWatchRoleName: !Ref CloudTrailCloudWatchRoleName
+        CloudTrailBaseName: !Ref CloudTrailBaseName
+        DynamoDBTableBaseName: !Ref DynamoDBTableBaseName
+      TimeoutInMinutes: 15
+  ###################################### Glue Crawler ##############################################################
+  DeutziaGlue:
+    DependsOn:
+      - DeutziaIAMRole
+      - DeutziaS3Bucket
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Retain
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub 'https://${CodeRepositoryS3Bucket}.s3.amazonaws.com/0090-deutzia/cft/nested-stacks/glue-crawler-stack.yaml'
+      Parameters:  
+        ProjectName: !Ref ProjectName
+        Environment: !Ref Environment
+        S3BucketBaseName: !Ref S3BucketBaseName
+        S3DefaultFolder: "audit-trail"
+        GlueDatabaseBaseName: !Ref GlueDatabaseBaseName
+        GlueCrawlerBaseName: !Ref GlueCrawlerBaseName
+        GlueExecutionRoleName: !Ref GlueExecutionRoleName
+      TimeoutInMinutes: 15
+  ###################################### Athena WorkGroup ##############################################################
+  DeutziaAthenaWorkGroup:
+    DependsOn:
+      - DeutziaS3Bucket
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Retain
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub 'https://${CodeRepositoryS3Bucket}.s3.amazonaws.com/0090-deutzia/cft/nested-stacks/athena-stack.yaml'
+      Parameters:  
+        ProjectName: !Ref ProjectName
+        Environment: !Ref Environment
+        AthenaWorkGroupBaseName: 'athena-work-group'
+        S3BucketBaseName: !Ref S3BucketBaseName
+        S3DefaultFolder: "athena-output"
+      TimeoutInMinutes: 15
+  ###################################### Lambda Event Source Mapping ###############################
+  DeutziaLambdaEventSourceMapping:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      BatchSize: !Ref KinesisBatchSize
+      MaximumBatchingWindowInSeconds: !Ref KinesisBatchWindow
+      DestinationConfig:
+        OnFailure:
+          Destination: !GetAtt DeutziaSQSDestinationForKinesis.Outputs.SQSQueueArn
+      ParallelizationFactor: !Ref KinesisConcBatchesPerShard
+      MaximumRetryAttempts: !Ref KinesisLambdaMaxRetryAttempts
+      BisectBatchOnFunctionError: True
+      EventSourceArn: !Sub 'arn:${AWS::Partition}:kinesis:${AWS::Region}:${AWS::AccountId}:stream/${ProjectName}-${KinesisDataStreamBaseName}-${Environment}-${AWS::Region}'
+      FunctionName: !GetAtt DeutziaLambdaFunction.Outputs.LambdaFunctionArn
+      StartingPosition: TRIM_HORIZON
+Outputs:
+  DeutziaS3BucketArn:
+    Description: Deutzia S3 Bucket Arn
+    Value: !GetAtt DeutziaS3Bucket.Outputs.S3LandingZoneBucketArn
+  DeutziaDynamoDBTableArn: 
+    Description: Deutzia DynamoDB Table Arn
+    Value: !GetAtt DeutziaDynamoDBTable.Outputs.DynamoDBTableArn
+  DeutziaKinesisDataStreamArn:
+    Description: The Arn of the Kinesis Data Stream.
+    Value: !GetAtt DeutziaKinesisDataStream.Outputs.KinesisDataStreamArn
+  DeutziaSQSDestinationForKinesisArn:
+    Description: Arn of the Kineisis Error Destination SQS Queue
+    Value: !GetAtt DeutziaSQSDestinationForKinesis.Outputs.SQSQueueArn
+  DeutziaSQSDestinationForKinesisURL:
+    Description: URL of the Kineisis Error Destination SQS Queue
+    Value: !GetAtt DeutziaSQSDestinationForKinesis.Outputs.SQSQueueURL
+  DeutziaLambdaExecutionRoleArn:
+    Description: The Arn of the Lambda Function.
+    Value: !GetAtt DeutziaIAMRole.Outputs.LambdaExecutionRoleArn
+  DeutziaCloudTrailCloudWatchRoleArn:
+    Description: The Arn of the Kinesis Data Stream.
+    Value: !GetAtt DeutziaIAMRole.Outputs.CloudWatchCloudTrailRoleArn
+  DeutziaGlueRoleArn:
+    Description: The Arn of the Glue Role.
+    Value: !GetAtt DeutziaIAMRole.Outputs.GuleRoleArn
+  DeutziaLambdaFunctionArn:
+    Description: Deutzia Lambda Execution Role Arn
+    Value: !GetAtt DeutziaLambdaFunction.Outputs.LambdaFunctionArn
+  DeutziaCloudWatchLogGroupArn:
+    Description: Arn of the CloudWatch Log Group
+    Value: !GetAtt DeutziaCloudWatchLogGroup.Outputs.CWLogGroupArn
+  DeutziaGlueDatabaseArn:
+    Description: Arn of the Glue Database
+    Value: !GetAtt DeutziaGlue.Outputs.GlueDatabaseArn
+  DeutziaGlueCrawlerArn:
+    Description: Arn of the Glue Crawler
+    Value: !GetAtt DeutziaGlue.Outputs.GlueCrawlerArn
+  DeutziaAthenaWorkGroupArn:
+    Description: Arn of Athena WorkGroup
+    Value: !GetAtt DeutziaAthenaWorkGroup.Outputs.AthenaWorkGroupArn
+

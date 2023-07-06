@@ -1,0 +1,384 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  Project Deutzia: CFN Template to create am IAM Role for Lambda Function
+
+Metadata:
+  TemplateName: iam-role-stack.yaml
+  TemplateType: IAM Role / IAM Policy
+  Version: 1.0.0
+  Owner: Subhamay Bhattacharyya
+  ProjectName: Tarius
+  Modification History:
+    - 1.0.0  - Jun 29, 2023   -- Initial Version 
+  Resources: 
+    - IAM Role
+    - IAM Policy Attached To The Role
+  StepsToTest: |
+    Manualy verify the Stack.
+  StepsToCleanup: |
+    Stack delete command
+
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+    #################################### Project Name and Environment ##############################
+    - Label: 
+        default: "Project And Environment:"
+      Parameters: 
+        - ProjectName
+        - Environment
+    #################################### KMS Key ###################################################
+    # - Label: 
+    #     default: "KMS Configuration:"
+    #   Parameters: 
+    #   - KmsMasterKeyId
+    #################################### S3 Bucket #################################################
+    - Label: 
+        default: "Landing Zone S3 Bucket:"
+      Parameters:
+        - S3BucketBaseName
+    #################################### Glue IAM Role and Policy  #################################
+    - Label:
+        default: "Glue IAM Role and Policy:"
+      Parameters:
+      - GlueExecutionRoleName
+      - GlueExecutionPolicyName
+    #################################### Lambda Function ###########################################
+    - Label:
+        default: "Lambda Function:"
+      Parameters:
+      - LambdaFunctionBaseName
+      - LambdaExecutionRoleName
+      - LambdaExecutionPolicyName
+    #################################### Kinesis Data Stream #######################################
+    - Label: 
+        default: "Kinesis Data Stream Configuration:"
+      Parameters:
+      - KinesisDataStreamBaseName
+    #################################### DynamoDB Table ############################################
+    # - Label: 
+    #     default: "DynamoDB Configuration:"
+    #   Parameters: 
+    #   - DynamoDBTableBaseName
+    #################################### SNS Topic #################################################
+    # - Label: 
+    #     default: "SNS Topic:"
+    #   Parameters: 
+    #     - SNSTopicBaseName
+    #################################### SQS Queue #################################################
+    - Label: 
+        default: "SQS Queue:"
+      Parameters: 
+        - SQSQueueBaseName
+    ParameterLabels:
+      ########################################### Project Name and Environment #######################
+      ProjectName:
+        default: "Project Name."
+      Environment:
+        default: "Environment Name."
+      ################################## Lambda Function ###########################################
+      LambdaFunctionBaseName:
+        default: "The Base Name Of The Lambda Function."
+      LambdaExecutionRoleName: 
+        default: "Lambda Function Execution Role Name."
+      LambdaExecutionPolicyName:
+        default: "Lambda Function Execution Policy Name."
+      ################################## Glue IAM Role and Policy ##################################
+      GlueExecutionRoleName:
+        default: "Glue Crawler Execution Role Name."
+      GlueExecutionPolicyName:
+        default: "Glue Crawler Execution Policy Name."
+      ################################## DynamoDB Table ############################################
+      # DynamoDBTableBaseName: 
+      #   default: "DynamoDB Table Base Name."
+      ################################## SNS Topic #################################################
+      # SNSTopicBaseName:
+      #   default: "SNS Topic Base Name."
+      ################################## SQS Queue #################################################
+      # SQSQueueBaseName:
+      #   default: "SQS Queue Base Name."
+
+      ################################## Kinesis Data Stream #######################################
+      KinesisDataStreamBaseName:
+        default: "The Kinesis Data Stream Name."
+      ################################## SQS Queue #################################################
+      SQSQueueBaseName:
+        default: "SQS Queue Base Name."
+Parameters:
+  ################## Project Name and Environment ##################################################
+  ProjectName:
+    Default: deutzia
+    Description: "The Project Name."
+    Type: String
+    MinLength: 4
+    MaxLength: 30
+    AllowedPattern: "[a-z]*"
+    ConstraintDescription: "The length should be between 5 and 30, must contain only lowercase alphabets."
+  Environment:
+    Default: devl
+    Description: "The Environment Name."
+    Type: String
+    AllowedValues: ["devl", "test", "prod"]
+    ConstraintDescription: "The Environment must be devl / test or prod"
+  ###################################### KMS #######################################################
+  # KmsMasterKeyId:
+  #   Default: "e4c733c5-9fbe-4a90-bda1-6f0362bc9b89"
+  #   Description: "The KMS Key Id Used For Encryption."
+  #   Type: String
+  #   MinLength: 36
+  #   MaxLength: 36
+  #   AllowedPattern: "[a-z0-9-]*"
+  #   ConstraintDescription: "The length of the KMS Key Id should be 36 and must be lowercase alphabets, numbers and dash."
+  ###################################### S3 Bucket #################################################
+  S3BucketBaseName:
+    Default: s3-bucket-base-name
+    Description: "The S3 Bucket Base Name For The Source Data. The Region And Environment Will Be Added As Suffix By The Template."
+    Type: String
+    MinLength: 3
+    MaxLength: 40
+    AllowedPattern: "[a-z][a-z0-9-.]*"
+    ConstraintDescription: "The length should be between 3 and 40, must contain only lowercase letter,numbers,dash, dot and should start with a letter."
+  ##################################### Lambda Function ###########################################
+  LambdaFunctionBaseName:
+    Default: some-lambda-function-name
+    Description: Lambda Function Name Base Name
+    Type: String
+    MinLength: 10
+    MaxLength: 40
+    AllowedPattern: "[a-zA-Z0-9-]*"
+    ConstraintDescription: The length should be between 10 and 40, must contain only alphanumeric or dash.
+  LambdaExecutionRoleName:
+    Default: lambda-function-role-name
+    Description: Lambda Function Execution Role Name
+    Type: String
+    MinLength: 10
+    MaxLength: 40
+    AllowedPattern: "[a-zA-Z0-9-]*"
+    ConstraintDescription: The length should be between 20 and 60, must contain only alphanumeric or dash.
+  LambdaExecutionPolicyName:
+    Default: policy-name
+    Description: Lambda Function Execution Policy Name
+    Type: String
+    MinLength: 10
+    MaxLength: 40
+    AllowedPattern: "[a-zA-Z0-9-]*"
+    ConstraintDescription: The length should be between 20 and 60, must contain only alphanumeric or dash.
+  ###################################### Glue IAM Role and Policy ##################################
+  GlueExecutionRoleName:
+    Default: glue-iam-role
+    Description: "The Execution Role Of The Glue Crawler."
+    Type: String
+    MinLength: 10
+    MaxLength: 50
+    AllowedPattern: '[a-zA-Z-]*'
+    ConstraintDescription: "Must be between 10 and 50 characters long and begin with a letter and can contain number or hyphen (-)."
+  GlueExecutionPolicyName:
+    Default: glue-iam-policy
+    Description: "The Execution Policy Attached To Glue IAM Role."
+    Type: String
+    MinLength: 10
+    MaxLength: 50
+    AllowedPattern: '[a-zA-Z-]*'
+    ConstraintDescription: "Must be between 10 and 50 characters long and begin with a letter and can contain number or hyphen (-)."
+  ###################################### CloudTrail ################################################
+  CloudTrailCloudWatchRoleName:
+    Default: cloudtrail-iam-role
+    Description: "The Execution Role Of The CloudTrail CloudWatch Log."
+    Type: String
+    MinLength: 10
+    MaxLength: 50
+    AllowedPattern: '[a-zA-Z-]*'
+    ConstraintDescription: "Must be between 10 and 50 characters long and begin with a letter and can contain number or hyphen (-)."
+  CloudTrailCloudWatchPolicyName:
+    Default: cloudtrail-iam-policy
+    Description: "The Execution Policy Attached To The CloudTrail CloudWatch IAM Role."
+    Type: String
+    MinLength: 10
+    MaxLength: 50
+    AllowedPattern: '[a-zA-Z-]*'
+    ConstraintDescription: "Must be between 10 and 50 characters long and begin with a letter and can contain number or hyphen (-)."
+  ###################################### CloudWatch ################################################
+  CloudWatchLogGroupBaseName:
+    Default: cloudtrail-logs
+    Description: "The Base Name The CloudWatch Log Group.The Region And Environment Will Be Added As Suffix By The Template."
+    Type: String
+    MinLength: 10
+    MaxLength: 50
+    AllowedPattern: '[a-zA-Z-]*'
+    ConstraintDescription: "Must be between 10 and 50 characters long and begin with a letter and can contain number or hyphen (-)."
+  ###################################### Kinesis Data Stream #######################################
+  KinesisDataStreamBaseName:
+    Default: kinesis-data-stream
+    Description: The Name Of The Kinesis Datastream.
+    Type: String
+    MinLength: 15
+    MaxLength: 100
+    AllowedPattern: '[a-zA-Z-]*'
+    ConstraintDescription: Must be between 15 and 100 characters long and begin with a letter and can contain number or hyphen (-).
+###################################### SQS Queue #################################################
+  SQSQueueBaseName:
+    Default: "sqs-queue"
+    Description: "The Base Name Of The Sns Topic. The Region And Environment Will Be Added As Suffix By The Template."
+    Type: String
+    MinLength: 8
+    MaxLength: 40
+    AllowedPattern: "[a-z][a-z0-9-]*"
+    ConstraintDescription: "The length should be between 8 and 40, must contain only lowercase letter, number, dash, dot and should start with a letter."
+Resources:
+  ###################################### Lambda Execution Role #####################################
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Ref LambdaExecutionRoleName
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Policies:
+        - PolicyName: !Ref LambdaExecutionPolicyName
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Sid: AllowCloudWatchLogStream
+              Effect: Allow
+              Action: 
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource: !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${ProjectName}-${LambdaFunctionBaseName}-${Environment}-${AWS::Region}:*'
+            - Sid: AllowReadWriteAccessToS3Bucket
+              Effect: Allow
+              Action: 
+                - s3:GetObject
+                - s3:PutObject
+              Resource: !Sub 'arn:${AWS::Partition}:s3:::${ProjectName}-${S3BucketBaseName}-${Environment}-${AWS::Region}/audit-trail/*'
+            - Sid: AllowSQSSendMessage
+              Effect: Allow
+              Action: 
+                - sqs:SendMessage
+              Resource:
+                - !Sub 'arn:${AWS::Partition}:sqs:${AWS::Region}:${AWS::AccountId}:${ProjectName}-${SQSQueueBaseName}-${Environment}-${AWS::Region}'
+            - Sid: AllowKinesisDataStream
+              Effect: Allow
+              Action: 
+                - kinesis:ListStreams
+                - kinesis:GetRecords
+                - kinesis:GetShardIterator
+                - kinesis:DescribeStream
+                - kinesis:ListShards
+              Resource: !Sub 'arn:${AWS::Partition}:kinesis:${AWS::Region}:${AWS::AccountId}:stream/${ProjectName}-${KinesisDataStreamBaseName}-${Environment}-${AWS::Region}' 
+      Tags: 
+        - Key: ProjectName
+          Value: !Ref ProjectName
+        - Key:  Environment
+          Value: !Ref Environment
+  ###################################### CloudWatch Role for CloudTrail ############################
+  CloudWatchCloudTrailRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Ref CloudTrailCloudWatchRoleName
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - logs.amazonaws.com
+            - cloudtrail.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Policies:
+        - PolicyName: !Ref CloudTrailCloudWatchPolicyName
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Sid: AWSCloudTrailCreateLogStream
+              Effect: Allow
+              Action: 
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource: !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${ProjectName}-${CloudWatchLogGroupBaseName}-${Environment}-${AWS::Region}:*'
+            - Sid: AllowAccessToKinesis 
+              Effect: Allow 
+              Action:
+                - kinesis:PutRecord
+                - kinesis:ListStreams
+                - kinesis:GetRecords
+                - kinesis:GetShardIterator
+                - kinesis:DescribeStream
+                - kinesis:ListShards
+              Resource: !Sub 'arn:${AWS::Partition}:kinesis:${AWS::Region}:${AWS::AccountId}:stream/${ProjectName}-${KinesisDataStreamBaseName}-${Environment}-${AWS::Region}' 
+      Tags: 
+      - Key: ProjectName
+        Value: !Ref ProjectName
+      - Key:  Environment
+        Value: !Ref Environment
+  ###################################### Glue Role #################################################
+  GlueJobRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${ProjectName}-${GlueExecutionRoleName}'
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: "Allow"
+            Principal:
+              Service:
+                - "glue.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Path: "/"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole
+      Policies:
+        -
+          PolicyName: !Sub '${ProjectName}-${GlueExecutionPolicyName}'
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              -
+                Sid: "AllowReadOnCodeAndSourceDataBucket"
+                Effect: "Allow"
+                Action: 
+                - 's3:GetObject'
+                Resource: 
+                  - !Sub 'arn:${AWS::Partition}:s3:::${ProjectName}-${S3BucketBaseName}-${Environment}-${AWS::Region}/audit-trail/*'
+              -
+                Sid: "AllowWriteOnTargetBucket"
+                Effect: "Allow"
+                Action: 
+                - 's3:GetObject'
+                - 's3:PutObject'
+                - 's3:ListBucket'
+                - 's3:DeleteObject'
+                Resource: 
+                  - !Sub 'arn:${AWS::Partition}:s3:::${ProjectName}-${S3BucketBaseName}-${Environment}-${AWS::Region}'
+                  - !Sub 'arn:${AWS::Partition}:s3:::${ProjectName}-${S3BucketBaseName}-${Environment}-${AWS::Region}/audit-trail/*'
+              - Sid: "AllowCreateLogGroupAndStream"
+                Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+                Effect: Allow
+                Resource: 
+                  - !Sub "arn:${AWS::Partition}:logs:us-east-1:${AWS::AccountId}:log-group:/aws-glue/jobs/*:*"
+      Tags: 
+      - Key: ProjectName
+        Value: !Ref ProjectName
+      - Key:  Environment
+        Value: !Ref Environment
+Outputs:
+  LambdaExecutionRoleArn:
+    Description: The Arn of the Lambda Execution Role
+    Value: !GetAtt LambdaExecutionRole.Arn
+  CloudWatchCloudTrailRoleArn:
+    Description: The Arn of the CloudTrail CloudWatch IAM Role
+    Value: !GetAtt CloudWatchCloudTrailRole.Arn
+  GuleRoleArn:
+    Description: The Arn of the Glue IAM Role
+    Value: !GetAtt GlueJobRole.Arn

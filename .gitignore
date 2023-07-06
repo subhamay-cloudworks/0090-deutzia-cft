@@ -1,0 +1,4 @@
+.DS_Store
+code/python/*.zip
+code/python/*old.py
+data/response.json

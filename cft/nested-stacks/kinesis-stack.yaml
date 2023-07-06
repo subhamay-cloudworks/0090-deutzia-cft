@@ -1,0 +1,123 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  Project Deutzia : CFN Template To Create Kinesis Data Stream Encrypted With Customer Managed KMS Key. 
+
+Metadata:
+  TemplateName: kinesis-stack.yaml
+  TemplateType: Kinesis Data Stream with KMS Encryption
+  Version: 1.0.0
+  Owner: Subhamay Bhattacharyya
+  ProjectName: Rugops
+  Modification History:
+    - 1.0.0  - Jun 28, 2023   -- Initial Version 
+  Resources: 
+    - Kinesis Data Stream Encrypted With Customer Managed KMS.
+  StepsToTest: |
+    Manualy verify the Stack.
+  StepsToCleanup: |
+    Stack delete command
+
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+    #################################### Project Name and Environment ##############################
+    - Label: 
+        default: "Project And Environment:"
+      Parameters: 
+        - ProjectName
+        - Environment
+    #################################### KMS Key ###################################################
+    # - Label: 
+    #     default: "KMS Configuration:"
+    #   Parameters: 
+    #     - KinesisKmsMasterKeyAlias
+    #################################### Kinesis Data Stream #######################################
+    - Label: 
+        default: "Kinesis Data Stream:"
+      Parameters: 
+        - KinesisDataStreamBaseName
+        - KinesisDataStreamRetensionPeriod
+        - KinesisShardCount
+    ParameterLabels:
+      #################################### Project Name and Environment ############################
+      ProjectName:
+        default: "The Project Name."
+      Environment:
+        default: "Environment Name."
+      #################################### KMS Key #################################################
+      # KinesisKmsMasterKeyAlias:
+      #   default: "Kinesis KMS Key Alias."
+      ################################## Kinesis Data Stream #######################################
+      KinesisDataStreamBaseName:
+        default: "The Kinesis Data Stream Name."
+      KinesisDataStreamRetensionPeriod:
+        default: "The Kinesis Data Stream Retension Period."
+      KinesisShardCount:
+        default: "Kinesis Shard Count."
+Parameters:
+  ###################################### Project Name and Environment ##############################
+  ProjectName:
+    Default: project
+    Description: "The Project Name."
+    Type: String
+    MinLength: 5
+    MaxLength: 30
+    AllowedPattern: "[a-z]*"
+    ConstraintDescription: "The length should be between 5 and 30, must contain only lowercase alphabets."
+  Environment:
+    Default: devl
+    Description: "The Environment Name."
+    Type: String
+    AllowedValues: ["devl", "test", "prod"]
+    ConstraintDescription: "The Environment must be devl / test or prod"
+  ###################################### KMS Key ###################################################
+  # KinesisKmsMasterKeyAlias:
+  #   Default: "SB-KMS"
+  #   Description: "The KMS Master Key Alias To Be Used For Server Side Encryption."
+  #   Type: String
+  #   MinLength: 5
+  #   MaxLength: 20
+  #   AllowedPattern: "[a-zA-Z0-9-]*"
+  #   ConstraintDescription: "The length of the KMS Key Alias should be beteen 5 and 20 and can only contain lowercase alphanumeric characters and dash."
+  ###################################### Kinesis Data Stream #######################################
+  KinesisDataStreamBaseName:
+    Default: kinesis-data-stream
+    Description: The Name Of The Kinesis Datastream.
+    Type: String
+    MinLength: 15
+    MaxLength: 100
+    AllowedPattern: '[a-zA-Z-]*'
+    ConstraintDescription: Must be between 15 and 100 characters long and begin with a letter and can contain number or hyphen (-).
+  KinesisDataStreamRetensionPeriod:
+    Default: 24
+    Description: The Kinesis Datastream data retension period.
+    Type: Number
+    MinValue: '24'
+    MaxValue: '2500'
+    ConstraintDescription: must be between 24 and 2500.
+  KinesisShardCount:
+    Default: 1
+    Description: The Kinesis Datastream Shard Count.
+    Type: Number
+    MinValue: 1
+    MaxValue: 10
+    ConstraintDescription: must be between 1 and 10.
+Resources:
+  ###################################### Kinesis Data Stream #######################################
+  KinesisDataStream: 
+    Type: AWS::Kinesis::Stream 
+    Properties: 
+        Name: !Sub "${ProjectName}-${KinesisDataStreamBaseName}-${Environment}-${AWS::Region}"
+        RetentionPeriodHours: !Ref KinesisDataStreamRetensionPeriod
+        ShardCount: !Ref KinesisShardCount
+        # StreamEncryption:
+        #     EncryptionType: KMS 
+        #     KeyId: !Sub "alias/${KinesisKmsMasterKeyAlias}"
+        Tags: 
+        - Key: ProjectName
+          Value: !Ref ProjectName
+        - Key: EnvironmentName
+          Value: !Ref Environment
+Outputs:
+  KinesisDataStreamArn:
+    Description: The Arn of the Kinesis Data Stream.
+    Value: !GetAtt KinesisDataStream.Arn

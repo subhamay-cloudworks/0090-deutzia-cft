@@ -1,0 +1,185 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  Project Deutzia:  CFN Template To Create GlueCrawler
+
+Metadata:
+  TemplateName: glue-crawler-stack.yaml
+  TemplateType: Glue Crawler
+  Version: 1.0.0
+  Owner: Subhamay Bhattacharyya
+  ProjectName: Deutzia
+  Modification History:
+    - 1.0.0   - Jul 05, 2023           -- Initial Version 
+  Resources: 
+    - Glue Classifier
+    - Glue Database
+    - Glue Crawler
+  StepsToTest: |
+    Manualy verify the Stack.
+  StepsToCleanup: |
+    Stack delete command
+
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+    #################################### Project Name and Environment ##############################
+    - Label: 
+        default: "Project And Environment:"
+      Parameters: 
+        - ProjectName
+        - Environment
+    #################################### KMS Key ###################################################
+    # - Label: 
+    #     default: "KMS Configuration:"
+    #   Parameters: 
+    #   - KmsMasterKeyAlias
+    #################################### Glue Crawler ##############################################
+    - Label: 
+        default: "Glue Crawler Configuration:"
+      Parameters:
+        - GlueCrawlerBaseName
+        - GlueDatabaseBaseName
+        - GlueExecutionRoleName
+    - Label: 
+        default: "S3 Bucket Configuration:"
+      Parameters:
+        - S3BucketBaseName
+        - S3DefaultFolder
+    ParameterLabels:
+      ################################## Project Name and Environment ##############################
+      ProjectName:
+        default: "The Project Name."
+      Environment:
+        default: "Environment Name."
+      ################################## KMS #######################################################
+      # KmsMasterKeyAlias: 
+      #   default: "The KMS Master Key Alias To Be Used For Server Side Encryption."
+      ################################## S3 Bucket #################################################
+      S3BucketBaseName:
+        default: "S3 Bucket Base Name storing the table audit trail."
+      S3DefaultFolder:
+        default: "The S3 folder which will store the table audit trail data."
+      ################################## Glue Crawler ##############################################
+      GlueCrawlerBaseName:
+        default: "The Base Name of Glue Crawler.The Region And Environment Will Be Added As Suffix By The Template."
+      ################################## Glue Database #############################################
+      GlueDatabaseBaseName:
+        default: "The Base Name of Glue Database.The Region And Environment Will Be Added As Suffix By The Template."
+      GlueExecutionRoleName:
+        default: "Glue execution IAM Role name."
+      # CloudTrailBaseName:
+      #   default: "The Base Name of the CloudTrail Trail."
+      # S3BucketBaseName:
+      #   default: "CloudTrail S3 Bucket."
+      # S3DefaultFolder:
+      #   default: "Default folder of CloudTrail trail."
+Parameters:
+  ###################################### Project Name and Environment ##############################
+  ProjectName:
+    Default: project
+    Description: "The Project Name."
+    Type: String
+    MinLength: 5
+    MaxLength: 30
+    AllowedPattern: "[a-z]*"
+    ConstraintDescription: "The length should be between 5 and 30, must contain only lowercase alphabets."
+  Environment:
+    Default: devl
+    Description: "The Environment Name."
+    Type: String
+    AllowedValues: ["devl", "test", "prod"]
+    ConstraintDescription: "The Environment must be devl / test or prod"
+  ###################################### KMS #######################################################
+  # KmsMasterKeyAlias:
+  #   Default: "SB-KMS"
+  #   Description: "The KMS Master Key Alias To Be Used For Server Side Encryption."
+  #   Type: String
+  #   MinLength: 5
+  #   MaxLength: 20
+  #   AllowedPattern: "[a-zA-Z0-9-]*"
+  #   ConstraintDescription: "The length of the KMS Key Alias should be beteen 5 and 20 and can only contain lowercase alphanumeric characters and dash."
+  ###################################### S3 Bucket #################################################
+  S3BucketBaseName:
+    Default: some-s3-bucket-name
+    Description: "The S3 Bucket Base Name For The Source Data, The Region Will Be Added As Suffix By The Template."
+    Type: String
+    MinLength: 3
+    MaxLength: 40
+    AllowedPattern: "[a-z][a-z0-9-.]*"
+    ConstraintDescription: "The length should be between 3 and 40, must contain only lowercase letter,numbers,dash, dot and should start with a letter."
+  S3DefaultFolder:
+    Default: "audit-trail"
+    Description: "The Folder To Be Created For Storing The Raw Data. Use Do_not_create If You Do Not Want To Create Any Folder."
+    Type: String
+    ConstraintDescription: "Should be a comma seperated folder names." 
+  ###################################### Glue Database #############################################
+  GlueDatabaseBaseName:
+    Default: glue-database
+    Description: "The Base Name The Glue Database.The Region And Environment Will Be Added As Suffix By The Template."
+    Type: String
+    MinLength: 10
+    MaxLength: 40
+    AllowedPattern: '[a-zA-Z-]*'
+  ###################################### Glue Crawler ##############################################
+  GlueCrawlerBaseName:
+    Default: glue-crawler
+    Description: "The Base Name The Glue Database.The Region And Environment Will Be Added As Suffix By The Template."
+    Type: String
+    MinLength: 10
+    MaxLength: 40
+    AllowedPattern: '[a-zA-Z-]*'
+  GlueExecutionRoleName:
+    Default: glue-iam-role
+    Description: "The Execution Role Of The Glue Crawler."
+    Type: String
+    MinLength: 10
+    MaxLength: 50
+    AllowedPattern: '[a-zA-Z-]*'
+    ConstraintDescription: "Must be between 10 and 50 characters long and begin with a letter and can contain number or hyphen (-)."
+Resources:
+  ###################################### Glue Classifier ###########################################
+  GlueJsonClassifier:
+    Type: 'AWS::Glue::Classifier'
+    Properties:
+      JsonClassifier:
+        JsonPath: $[*]
+        Name: !Sub '${ProjectName}-glue-database-classifier'
+  ###################################### Glue Database #############################################
+  GlueDatabase:
+    Type: AWS::Glue::Database
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseInput:
+        Name: !Sub '${ProjectName}-${GlueDatabaseBaseName}-${Environment}-${AWS::Region}'
+        Description: !Sub '${ProjectName} glue database'
+        LocationUri: !Sub '${ProjectName}-${S3BucketBaseName}-${Environment}-${AWS::Region}/${S3DefaultFolder}'
+        Parameters:
+          project: !Ref ProjectName
+  ###################################### Glue Crawler ##############################################
+  GlueCrawler:
+    Type: AWS::Glue::Crawler
+    Properties:
+      Name: !Sub '${ProjectName}-${GlueCrawlerBaseName}-${Environment}-${AWS::Region}'
+      Role: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${ProjectName}-${GlueExecutionRoleName}'
+      DatabaseName: !Ref GlueDatabase
+      Configuration: "{\"Version\":1.0,\"Grouping\":{\"TableGroupingPolicy\":\"CombineCompatibleSchemas\"}}"
+      Classifiers:
+        - !Ref GlueJsonClassifier
+      Targets:
+        S3Targets:
+          - Path: !Sub '${ProjectName}-${S3BucketBaseName}-${Environment}-${AWS::Region}/${S3DefaultFolder}'
+      SchemaChangePolicy:
+        UpdateBehavior: "UPDATE_IN_DATABASE"
+        DeleteBehavior: "LOG"
+      TablePrefix: !Sub '${ProjectName}_'
+      Tags: 
+        "ProjectName": !Ref ProjectName
+        "Environment": !Ref Environment
+      Schedule:
+        ScheduleExpression: "cron(0/10 * ? * MON-SUN *)"
+Outputs:
+  GlueDatabaseArn: 
+    Description: The Arn of the Glue Crawler
+    Value: !Ref GlueDatabase
+  GlueCrawlerArn:
+    Description: The Arn of the Glue Crawler
+    Value: !Ref GlueCrawler

@@ -1,0 +1,130 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  Project Deutzia:  CFN Template To Create Athena WorkGroup
+
+Metadata:
+  TemplateName: athena-stack.yaml
+  TemplateType: Athena WorkGroup
+  Version: 1.0.0
+  Owner: Subhamay Bhattacharyya
+  ProjectName: Deutzia
+  Modification History:
+    - 1.0.0   - Jul 05, 2023           -- Initial Version 
+  Resources: 
+    - CloudTrail Trail
+  StepsToTest: |
+    Manualy verify the Stack.
+  StepsToCleanup: |
+    Stack delete command
+
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+    #################################### Project Name and Environment ##############################
+    - Label: 
+        default: "Project And Environment:"
+      Parameters: 
+        - ProjectName
+        - Environment
+    #################################### KMS Key ###################################################
+    # - Label: 
+    #     default: "KMS Configuration:"
+    #   Parameters: 
+    #   - KmsMasterKeyAlias
+    #################################### CloudTrail ################################################
+    - Label: 
+        default: "Athena Configuration:"
+      Parameters:
+        - AthenaWorkGroupBaseName
+        - S3BucketBaseName
+        - S3DefaultFolder
+    ParameterLabels:
+      ################################## Project Name and Environment ##############################
+      ProjectName:
+        default: "The Project Name."
+      Environment:
+        default: "Environment Name."
+      ################################## KMS #######################################################
+      # KmsMasterKeyAlias: 
+      #   default: "The KMS Master Key Alias To Be Used For Server Side Encryption."
+      ################################## SNS #######################################################
+      ################################## CloudTrail ################################################
+      AthenaWorkGroupBaseName:
+        default: "The Base Name Athena WorkGroup.The Region And Environment Will Be Added As Suffix By The Template."
+      S3BucketBaseName:
+        default: "CloudTrail S3 Bucket."
+      S3DefaultFolder:
+        default: "Default folder of CloudTrail trail."
+Parameters:
+  ###################################### Project Name and Environment ##############################
+  ProjectName:
+    Default: project
+    Description: "The Project Name."
+    Type: String
+    MinLength: 5
+    MaxLength: 30
+    AllowedPattern: "[a-z]*"
+    ConstraintDescription: "The length should be between 5 and 30, must contain only lowercase alphabets."
+  Environment:
+    Default: devl
+    Description: "The Environment Name."
+    Type: String
+    AllowedValues: ["devl", "test", "prod"]
+    ConstraintDescription: "The Environment must be devl / test or prod"
+  ###################################### KMS #######################################################
+  # KmsMasterKeyAlias:
+  #   Default: "SB-KMS"
+  #   Description: "The KMS Master Key Alias To Be Used For Server Side Encryption."
+  #   Type: String
+  #   MinLength: 5
+  #   MaxLength: 20
+  #   AllowedPattern: "[a-zA-Z0-9-]*"
+  #   ConstraintDescription: "The length of the KMS Key Alias should be beteen 5 and 20 and can only contain lowercase alphanumeric characters and dash."
+  ###################################### S3 Bucket #################################################
+  S3BucketBaseName:
+    Default: cloudtrail
+    Description: "The S3 Bucket Base Name For The CloudTrail Data. The Region And Environment Will Be Added As Suffix By The Template."
+    Type: String
+    MinLength: 3
+    MaxLength: 40
+    AllowedPattern: "[a-z][a-z0-9-.]*"
+    ConstraintDescription: "The length should be between 3 and 40, must contain only lowercase letter,numbers,dash, dot and should start with a letter."
+  S3DefaultFolder:
+    Default: "athena-output"
+    Description: "The Folder To Be Created For Storing The Raw Data. Use Do_not_create If You Do Not Want To Create Any Folder."
+    Type: String
+    ConstraintDescription: "Should be a comma seperated folder names." 
+  ###################################### CloudWatch ################################################
+  AthenaWorkGroupBaseName:
+    Default: athena-output
+    Description: "The Base Name The CloudWatch Log Group.The Region And Environment Will Be Added As Suffix By The Template."
+    Type: String
+    MinLength: 10
+    MaxLength: 40
+    AllowedPattern: '[a-zA-Z-]*'
+Resources:
+  ###################################### CloudTrail Trail ##########################################
+  AthenaWorkGroup:
+    Type: AWS::Athena::WorkGroup
+    Properties:
+      Name: !Sub '${ProjectName}-${AthenaWorkGroupBaseName}-${Environment}-${AWS::Region}'
+      Description: !Sub '${ProjectName} Athena WorkGroup'
+      RecursiveDeleteOption: True
+      State: DISABLED
+      Tags:
+        - Key: ProjectName
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+      WorkGroupConfiguration:
+        BytesScannedCutoffPerQuery: 10000000
+        EnforceWorkGroupConfiguration: true
+        PublishCloudWatchMetricsEnabled: true
+        RequesterPaysEnabled: false
+        ResultConfiguration:
+          EncryptionConfiguration:
+            EncryptionOption: SSE_S3
+          OutputLocation: !Sub 's3://${ProjectName}-${S3BucketBaseName}-${Environment}-${AWS::Region}/${S3DefaultFolder}'
+Outputs:
+  AthenaWorkGroupArn:
+    Description: Arn of the Athena WorkGroup
+    Value: !Ref AthenaWorkGroup
